@@ -121,6 +121,8 @@
 // export default App;
 
 import { useState, useEffect, useRef } from "react";
+import { Routes, Route, useNavigate } from 'react-router-dom';
+import ProductPage from './ProductPage';
 
 const API_URL = "http://localhost:8000";
 
@@ -347,10 +349,12 @@ function Stars({ rating }) {
 // ─── COMPONENT: PRODUCT CARD ─────────────────────────────────────────────────
 function ProductCard({ product, onAdd, added }) {
   const [hover, setHover] = useState(false);
+  const navigate = useNavigate();
   return (
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      onClick={() => navigate(`/product/${product._id}`)}
       style={{
         background: hover ? "#1a1a1a" : "#111",
         border: `1px solid ${hover ? "#444" : "#222"}`,
@@ -1663,6 +1667,15 @@ export default function App() {
       {/* PROFILE MODAL */}
       {modal === "profile" && <ProfileModal onClose={() => setModal(null)} />}
     </>
+  );
+}
+
+export function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<App />} />
+      <Route path="/product/:id" element={<ProductPage />} />
+    </Routes>
   );
 }
 
