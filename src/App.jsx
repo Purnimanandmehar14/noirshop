@@ -119,10 +119,10 @@
 // }
 
 // export default App;
-
 import { useState, useEffect, useRef } from "react";
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import ProductPage from './ProductPage';
+import AuthModal from './AuthModal';
 
 const API_URL = "http://localhost:8000";
 
@@ -1324,7 +1324,12 @@ export default function App() {
   const [category, setCategory] = useState("All");
   const [sort, setSort] = useState("Featured");
   const [added, setAdded] = useState({});
-  const [modal, setModal] = useState(null); // null | "checkout" | "profile"
+  // const [modal, setModal] = useState(null); // null | "checkout" | "profile"
+  const [modal, setModal] = useState(null);
+  const [user, setUser] = useState(() => {
+  const saved = localStorage.getItem("user");
+  return saved ? JSON.parse(saved) : null;
+  });
 
   const handleAdd = (product) => {
     add(product);
@@ -1414,20 +1419,20 @@ export default function App() {
           </div>
 
           <button
-            onClick={() => setModal("profile")}
-            style={{
-              background: "none",
-              border: "1px solid #222",
-              color: "#888",
-              borderRadius: "8px",
-              padding: "8px 14px",
-              cursor: "pointer",
-              fontSize: "12px",
-              fontFamily: "'Space Mono', monospace",
-            }}
-          >
-            👤 Profile
-          </button>
+  onClick={() => setModal(user ? "profile" : "auth")}
+  style={{
+    background: "none",
+    border: "1px solid #222",
+    color: "#888",
+    borderRadius: "8px",
+    padding: "8px 14px",
+    cursor: "pointer",
+    fontSize: "12px",
+    fontFamily: "'Space Mono', monospace",
+  }}
+>
+  👤 {user ? user.name.split(" ")[0] : "Login"}
+</button>
 
           <button
             onClick={() => toggle(true)}
@@ -1665,7 +1670,15 @@ export default function App() {
       )}
 
       {/* PROFILE MODAL */}
-      {modal === "profile" && <ProfileModal onClose={() => setModal(null)} />}
+{modal === "profile" && <ProfileModal onClose={() => setModal(null)} />}
+
+{/* AUTH MODAL */}
+{modal === "auth" && (
+  <AuthModal
+    onClose={() => setModal(null)}
+    onSuccess={(u) => { setUser(u); setModal(null); }}
+  />
+)}
     </>
   );
 }
