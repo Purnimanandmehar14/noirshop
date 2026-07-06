@@ -122,6 +122,11 @@
 
 import { useState, useEffect, useRef } from "react";
 
+const API_URL = "http://localhost:8000";
+
+// const [products, setProducts] = useState([]);
+
+
 // ─── MOCK DATA ──────────────────────────────────────────────────────────────
 const PRODUCTS = [
   {
@@ -1301,6 +1306,15 @@ function ProfileModal({ onClose }) {
 
 // ─── MAIN APP ────────────────────────────────────────────────────────────────
 export default function App() {
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/products`)
+      .then(res => res.json())
+      .then(data => setProducts(data))
+      .catch(err => console.log(err));
+  }, []);
+
   const { add, toggle, count, items } = useCart();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
@@ -1314,7 +1328,7 @@ export default function App() {
     setTimeout(() => setAdded((a) => ({ ...a, [product.id]: false })), 1500);
   };
 
-  const filtered = PRODUCTS.filter(
+  const filtered = products.filter(
     (p) =>
       (category === "All" || p.category === category) &&
       p.name.toLowerCase().includes(search.toLowerCase()),
