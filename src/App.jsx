@@ -120,14 +120,15 @@
 
 // export default App;
 import { useState, useEffect, useRef } from "react";
-import { Routes, Route, useNavigate } from 'react-router-dom';
-import ProductPage from './ProductPage';
-import AuthModal from './AuthModal';
+import { Routes, Route, useNavigate } from "react-router-dom";
+import ProductPage from "./ProductPage";
+import AuthModal from "./AuthModal";
+import AboutPage from "./AboutPage";
+import ContactPage from "./ContactPage";
 
 const API_URL = "http://localhost:8000";
 
 // const [products, setProducts] = useState([]);
-
 
 // ─── MOCK DATA ──────────────────────────────────────────────────────────────
 const PRODUCTS = [
@@ -299,18 +300,32 @@ const cartStore = createStore({ items: [], open: false });
 function useCart() {
   const [state, setState] = useState(cartStore.get());
   useEffect(() => cartStore.subscribe(setState), []);
-  const add = (product) =>
+
+  const saveCart = async (items) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    await fetch("http://localhost:8000/api/cart", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ items }),
+    });
+  };
+
+  const add = (product) => {
     cartStore.set((s) => {
       const exists = s.items.find((i) => i.id === product.id);
-      return {
-        ...s,
-        items: exists
-          ? s.items.map((i) =>
-              i.id === product.id ? { ...i, qty: i.qty + 1 } : i,
-            )
-          : [...s.items, { ...product, qty: 1 }],
-      };
+      const newItems = exists
+        ? s.items.map((i) =>
+            i.id === product.id ? { ...i, qty: i.qty + 1 } : i,
+          )
+        : [...s.items, { ...product, qty: 1 }];
+      saveCart(newItems);
+      return { ...s, items: newItems };
     });
+  };
   const remove = (id) =>
     cartStore.set((s) => ({ ...s, items: s.items.filter((i) => i.id !== id) }));
   const update = (id, qty) =>
@@ -323,6 +338,18 @@ function useCart() {
     }));
   const toggle = (v) => cartStore.set((s) => ({ ...s, open: v ?? !s.open }));
   const clear = () => cartStore.set({ items: [], open: false });
+  //   const saveCart = async (items) => {
+  //   const token = localStorage.getItem('token');
+  //   if (!token) return;
+  //   await fetch('http://localhost:8000/api/cart', {
+  //     method: 'POST',
+  //     headers: {
+  //       'Content-Type': 'application/json',
+  //       'Authorization': `Bearer ${token}`
+  //     },
+  //     body: JSON.stringify({ items })
+  //   });
+  // };
   const total = state.items.reduce((acc, i) => acc + i.price * i.qty, 0);
   const count = state.items.reduce((acc, i) => acc + i.qty, 0);
   return { ...state, add, remove, update, toggle, clear, total, count };
@@ -1314,9 +1341,24 @@ export default function App() {
 
   useEffect(() => {
     fetch(`${API_URL}/api/products`)
-      .then(res => res.json())
-      .then(data => setProducts(data))
-      .catch(err => console.log(err));
+      .then((res) => res.json())
+      .then((data) => setProducts(data))
+      .catch((err) => console.log(err));
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch(`${API_URL}/api/cart`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.items?.length > 0) {
+          cartStore.set({ items: data.items, open: false });
+        }
+      })
+      .catch((err) => console.log(err));
   }, []);
 
   const { add, toggle, count, items } = useCart();
@@ -1324,30 +1366,31 @@ export default function App() {
   const [category, setCategory] = useState("All");
   const [sort, setSort] = useState("Featured");
   const [added, setAdded] = useState({});
-  // const [modal, setModal] = useState(null); // null | "checkout" | "profile"
   const [modal, setModal] = useState(null);
   const [user, setUser] = useState(() => {
-  const saved = localStorage.getItem("user");
-  return saved ? JSON.parse(saved) : null;
+    const saved = localStorage.getItem("user");
+    return saved ? JSON.parse(saved) : null;
   });
 
   const handleAdd = (product) => {
     add(product);
-    setAdded((a) => ({ ...a, [product.id]: true }));
-    setTimeout(() => setAdded((a) => ({ ...a, [product.id]: false })), 1500);
+    setAdded((a) => ({ ...a, [product._id]: true }));
+    setTimeout(() => setAdded((a) => ({ ...a, [product._id]: false })), 1500);
   };
 
-  const filtered = products.filter(
-    (p) =>
-      (category === "All" || p.category === category) &&
-      p.name.toLowerCase().includes(search.toLowerCase()),
-  ).sort((a, b) => {
-    if (sort === "Price: Low→High") return a.price - b.price;
-    if (sort === "Price: High→Low") return b.price - a.price;
-    if (sort === "Top Rated") return b.rating - a.rating;
-    if (sort === "Most Reviewed") return b.reviews - a.reviews;
-    return 0;
-  });
+  const filtered = products
+    .filter(
+      (p) =>
+        (category === "All" || p.category === category) &&
+        p.name.toLowerCase().includes(search.toLowerCase()),
+    )
+    .sort((a, b) => {
+      if (sort === "Price: Low→High") return a.price - b.price;
+      if (sort === "Price: High→Low") return b.price - a.price;
+      if (sort === "Top Rated") return b.rating - a.rating;
+      if (sort === "Most Reviewed") return b.reviews - a.reviews;
+      return 0;
+    });
 
   return (
     <>
@@ -1361,114 +1404,34 @@ export default function App() {
       `}</style>
 
       {/* NAV */}
-      <nav
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
-          background: "rgba(8,8,8,.92)",
-          backdropFilter: "blur(12px)",
-          borderBottom: "1px solid #1a1a1a",
-          padding: "0 32px",
-          height: "60px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "'DM Serif Display', serif",
-            fontSize: "22px",
-            letterSpacing: "-0.5px",
-          }}
-        >
+      <nav style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(8,8,8,.92)", backdropFilter: "blur(12px)", borderBottom: "1px solid #1a1a1a", padding: "0 32px", height: "60px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: "22px", letterSpacing: "-0.5px" }}>
           noir<span style={{ color: "#c8f04e" }}>shop</span>
         </span>
 
         <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
+          <button onClick={() => navigate("/about")} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: "12px" }}>
+            About
+          </button>
+          <button onClick={() => navigate("/contact")} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: "12px" }}>
+            Contact
+          </button>
           <div style={{ position: "relative" }}>
-            <span
-              style={{
-                position: "absolute",
-                left: "10px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "#444",
-                fontSize: "13px",
-              }}
-            >
-              ⌕
-            </span>
+            <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "#444", fontSize: "13px" }}>⌕</span>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search products…"
-              style={{
-                background: "#111",
-                border: "1px solid #222",
-                borderRadius: "8px",
-                padding: "8px 12px 8px 28px",
-                color: "#f5f5f5",
-                fontFamily: "'Space Mono', monospace",
-                fontSize: "11px",
-                width: "220px",
-                outline: "none",
-              }}
+              style={{ background: "#111", border: "1px solid #222", borderRadius: "8px", padding: "8px 12px 8px 28px", color: "#f5f5f5", fontFamily: "'Space Mono', monospace", fontSize: "11px", width: "220px", outline: "none" }}
             />
           </div>
-
-          <button
-  onClick={() => setModal(user ? "profile" : "auth")}
-  style={{
-    background: "none",
-    border: "1px solid #222",
-    color: "#888",
-    borderRadius: "8px",
-    padding: "8px 14px",
-    cursor: "pointer",
-    fontSize: "12px",
-    fontFamily: "'Space Mono', monospace",
-  }}
->
-  👤 {user ? user.name.split(" ")[0] : "Login"}
-</button>
-
-          <button
-            onClick={() => toggle(true)}
-            style={{
-              position: "relative",
-              background: "#c8f04e",
-              color: "#0a0a0a",
-              border: "none",
-              borderRadius: "8px",
-              padding: "8px 18px",
-              fontFamily: "'Space Mono', monospace",
-              fontWeight: 700,
-              fontSize: "12px",
-              cursor: "pointer",
-              letterSpacing: "0.5px",
-            }}
-          >
+          <button onClick={() => setModal(user ? "profile" : "auth")} style={{ background: "none", border: "1px solid #222", color: "#888", borderRadius: "8px", padding: "8px 14px", cursor: "pointer", fontSize: "12px", fontFamily: "'Space Mono', monospace" }}>
+            👤 {user ? user.name.split(" ")[0] : "Login"}
+          </button>
+          <button onClick={() => toggle(true)} style={{ position: "relative", background: "#c8f04e", color: "#0a0a0a", border: "none", borderRadius: "8px", padding: "8px 18px", fontFamily: "'Space Mono', monospace", fontWeight: 700, fontSize: "12px", cursor: "pointer", letterSpacing: "0.5px" }}>
             🛒 Cart
             {count > 0 && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: "-6px",
-                  right: "-6px",
-                  background: "#e05555",
-                  color: "#fff",
-                  borderRadius: "50%",
-                  width: "18px",
-                  height: "18px",
-                  fontSize: "10px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: 700,
-                }}
-              >
+              <span style={{ position: "absolute", top: "-6px", right: "-6px", background: "#e05555", color: "#fff", borderRadius: "50%", width: "18px", height: "18px", fontSize: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>
                 {count}
               </span>
             )}
@@ -1477,124 +1440,33 @@ export default function App() {
       </nav>
 
       {/* HERO */}
-      <div
-        style={{
-          padding: "60px 32px 40px",
-          background: "linear-gradient(180deg, #0d0d0d 0%, #080808 100%)",
-          borderBottom: "1px solid #111",
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: "-40px",
-            right: "10%",
-            width: "400px",
-            height: "400px",
-            background:
-              "radial-gradient(circle, #c8f04e08 0%, transparent 70%)",
-            pointerEvents: "none",
-          }}
-        />
+      <div style={{ padding: "60px 32px 40px", background: "linear-gradient(180deg, #0d0d0d 0%, #080808 100%)", borderBottom: "1px solid #111", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: "-40px", right: "10%", width: "400px", height: "400px", background: "radial-gradient(circle, #c8f04e08 0%, transparent 70%)", pointerEvents: "none" }} />
         <div style={{ maxWidth: "700px" }}>
-          <div
-            style={{
-              color: "#c8f04e",
-              fontFamily: "'Space Mono', monospace",
-              fontSize: "11px",
-              letterSpacing: "3px",
-              marginBottom: "14px",
-            }}
-          >
+          <div style={{ color: "#c8f04e", fontFamily: "'Space Mono', monospace", fontSize: "11px", letterSpacing: "3px", marginBottom: "14px" }}>
             ✦ FREE SHIPPING OVER $150
           </div>
-          <h1
-            style={{
-              fontFamily: "'DM Serif Display', serif",
-              fontSize: "clamp(36px,5vw,56px)",
-              lineHeight: 1.1,
-              marginBottom: "16px",
-            }}
-          >
-            Curated gear for
-            <br />
+          <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "clamp(36px,5vw,56px)", lineHeight: 1.1, marginBottom: "16px" }}>
+            Curated gear for<br />
             <span style={{ color: "#c8f04e" }}>the deliberate life.</span>
           </h1>
-          <p
-            style={{
-              color: "#555",
-              fontSize: "13px",
-              lineHeight: 1.8,
-              maxWidth: "480px",
-            }}
-          >
-            {filtered.length} products across {CATEGORIES.length - 1} categories
-            — ruthlessly selected for quality and design.
+          <p style={{ color: "#555", fontSize: "13px", lineHeight: 1.8, maxWidth: "480px" }}>
+            {filtered.length} products across {CATEGORIES.length - 1} categories — ruthlessly selected for quality and design.
           </p>
         </div>
       </div>
 
       {/* FILTERS */}
-      <div
-        style={{
-          padding: "16px 32px",
-          borderBottom: "1px solid #111",
-          display: "flex",
-          gap: "12px",
-          alignItems: "center",
-          flexWrap: "wrap",
-          background: "#0a0a0a",
-        }}
-      >
+      <div style={{ padding: "16px 32px", borderBottom: "1px solid #111", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap", background: "#0a0a0a" }}>
         {CATEGORIES.map((c) => (
-          <button
-            key={c}
-            onClick={() => setCategory(c)}
-            style={{
-              background: category === c ? "#c8f04e" : "transparent",
-              color: category === c ? "#0a0a0a" : "#555",
-              border: `1px solid ${category === c ? "#c8f04e" : "#222"}`,
-              borderRadius: "6px",
-              padding: "6px 14px",
-              fontFamily: "'Space Mono', monospace",
-              fontSize: "11px",
-              cursor: "pointer",
-              fontWeight: category === c ? 700 : 400,
-              transition: "all 0.2s",
-            }}
-          >
+          <button key={c} onClick={() => setCategory(c)} style={{ background: category === c ? "#c8f04e" : "transparent", color: category === c ? "#0a0a0a" : "#555", border: `1px solid ${category === c ? "#c8f04e" : "#222"}`, borderRadius: "6px", padding: "6px 14px", fontFamily: "'Space Mono', monospace", fontSize: "11px", cursor: "pointer", fontWeight: category === c ? 700 : 400, transition: "all 0.2s" }}>
             {c}
           </button>
         ))}
-
-        <div
-          style={{
-            marginLeft: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
-        >
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ color: "#444", fontSize: "11px" }}>Sort:</span>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-            style={{
-              background: "#111",
-              border: "1px solid #222",
-              color: "#aaa",
-              borderRadius: "6px",
-              padding: "6px 10px",
-              fontFamily: "'Space Mono', monospace",
-              fontSize: "11px",
-              outline: "none",
-            }}
-          >
-            {SORT_OPTIONS.map((o) => (
-              <option key={o}>{o}</option>
-            ))}
+          <select value={sort} onChange={(e) => setSort(e.target.value)} style={{ background: "#111", border: "1px solid #222", color: "#aaa", borderRadius: "6px", padding: "6px 10px", fontFamily: "'Space Mono', monospace", fontSize: "11px", outline: "none" }}>
+            {SORT_OPTIONS.map((o) => <option key={o}>{o}</option>)}
           </select>
         </div>
       </div>
@@ -1602,60 +1474,25 @@ export default function App() {
       {/* GRID */}
       <div style={{ padding: "32px", maxWidth: "1400px", margin: "0 auto" }}>
         {filtered.length === 0 ? (
-          <div
-            style={{
-              textAlign: "center",
-              padding: "80px 0",
-              color: "#333",
-              fontFamily: "'Space Mono', monospace",
-            }}
-          >
+          <div style={{ textAlign: "center", padding: "80px 0", color: "#333", fontFamily: "'Space Mono', monospace" }}>
             <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔍</div>
             No products match your search.
           </div>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-              gap: "20px",
-            }}
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "20px" }}>
             {filtered.map((p) => (
-              <ProductCard
-                key={p.id}
-                product={p}
-                onAdd={handleAdd}
-                added={!!added[p.id]}
-              />
+              <ProductCard key={p._id} product={p} onAdd={handleAdd} added={!!added[p._id]} />
             ))}
           </div>
         )}
       </div>
 
       {/* FOOTER */}
-      <footer
-        style={{
-          borderTop: "1px solid #111",
-          padding: "32px",
-          textAlign: "center",
-          color: "#333",
-          fontFamily: "'Space Mono', monospace",
-          fontSize: "11px",
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "'DM Serif Display', serif",
-            color: "#444",
-            fontSize: "16px",
-          }}
-        >
+      <footer style={{ borderTop: "1px solid #111", padding: "32px", textAlign: "center", color: "#333", fontFamily: "'Space Mono', monospace", fontSize: "11px" }}>
+        <span style={{ fontFamily: "'DM Serif Display', serif", color: "#444", fontSize: "16px" }}>
           noir<span style={{ color: "#c8f04e33" }}>shop</span>
         </span>
-        <div style={{ marginTop: "8px" }}>
-          Built with React · Zustand · Stripe · Next.js · MongoDB
-        </div>
+        <div style={{ marginTop: "8px" }}>Built with React · Zustand · Stripe · Node.js · MongoDB</div>
       </footer>
 
       {/* CART DRAWER */}
@@ -1663,22 +1500,19 @@ export default function App() {
 
       {/* CHECKOUT MODAL */}
       {modal === "checkout" && (
-        <CheckoutModal
-          onClose={() => setModal(null)}
-          onSuccess={() => setModal(null)}
-        />
+        <CheckoutModal onClose={() => setModal(null)} onSuccess={() => setModal(null)} />
       )}
 
       {/* PROFILE MODAL */}
-{modal === "profile" && <ProfileModal onClose={() => setModal(null)} />}
+      {modal === "profile" && <ProfileModal onClose={() => setModal(null)} />}
 
-{/* AUTH MODAL */}
-{modal === "auth" && (
-  <AuthModal
-    onClose={() => setModal(null)}
-    onSuccess={(u) => { setUser(u); setModal(null); }}
-  />
-)}
+      {/* AUTH MODAL */}
+      {modal === "auth" && (
+        <AuthModal
+          onClose={() => setModal(null)}
+          onSuccess={(u) => { setUser(u); setModal(null); }}
+        />
+      )}
     </>
   );
 }
@@ -1688,7 +1522,8 @@ export function AppRoutes() {
     <Routes>
       <Route path="/" element={<App />} />
       <Route path="/product/:id" element={<ProductPage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/contact" element={<ContactPage />} />
     </Routes>
   );
 }
-
