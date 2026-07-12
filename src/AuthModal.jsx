@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://noirshop-backend.onrender.com";
 
 export default function AuthModal({ onClose, onSuccess }) {
   const [mode, setMode] = useState("login"); // login | signup

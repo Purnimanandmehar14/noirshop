@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://noirshop-backend.onrender.com";
 
 function Stars({ rating }) {
   return (
